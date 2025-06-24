@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   workflow_call:
 
+permissions:
+  contents: write # need this to be able to 'push' to the repo (to update the log file)
+
 jobs:
   log:
     runs-on: ubuntu-latest
