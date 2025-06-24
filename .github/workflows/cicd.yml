@@ -7,6 +7,9 @@ on:
   pull_request: # Runs on pull request
   workflow_dispatch: # Can be run manually
 
+permissions:
+  contents: write # needed for 'write-deployment-log'
+
 jobs:
 
   deploy-to-azure-vm:
