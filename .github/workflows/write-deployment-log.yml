@@ -31,7 +31,7 @@ jobs:
 
       - name: Create and Append deployment_log.md
         run: |
-          TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+          TIMESTAMP=$(TZ="Etc/GMT-3" date +"%Y-%m-%d %H:%M:%S")
 
           echo "Appending new deployment log entry..."
 
