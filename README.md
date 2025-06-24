@@ -893,12 +893,18 @@ we will add one more secret:
 
 Create with:
 ```bash
-az ad sp create-for-rbac --name "gh-actions" --sdk-auth
+# to see list of accounts associated
+az account list --output table
+
+# then create with this: (replace <SubscriptionId>)
+az ad sp create-for-rbac --name "gh-actions" --role contributor --scopes "/subscriptions/<SubscriptionId>" --sdk-auth
 ```
 - copy the entire json output into the `AZURE_CREDENTIALS` secret
  
 
-### new `post-deploy-week8.yml` file for week 8 additions:
+ ---
+## Get Public IP Name + Make IP Static + Get VM Public IP + Run Initial Healthcheck:
+### in new `post-deploy-week8.yml`:
 - Get Public IP Name
 - Make IP Static
 - Get VM Public IP
