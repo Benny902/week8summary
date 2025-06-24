@@ -1,6 +1,7 @@
 name: Attach P1 Disk
 
 on:
+  workflow_call:
   workflow_dispatch:
 
 jobs:
