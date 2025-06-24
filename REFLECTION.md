@@ -1,4 +1,4 @@
-# REFLECTION.MD
+# REFLECTION.MD  (this is from week 6)
 
 ## Learned:
 We learned how to create a full CI/CD pipeline using GitHub Actions, including build, lint, test, artifact upload, and notifications. We used matrix builds to test across multiple Node.js versions and added caching for faster installs.

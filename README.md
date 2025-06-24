@@ -878,4 +878,280 @@ and now we can see that the containers are running in the azure:
 
 # WEEK 8 – Summary Task: Azure Infrastructure
 
-## This week includes only the extra steps required for Week 8 Summary Task:
+## This week includes only the addition steps (on top of week 7) required for Week 8 Summary Task:
+
+## Flowchart:  
+![alt text](images/week7-architecture.png) 
+
+### GitHubSecrets Required (Settings > Secrets and variables > Actions): 
+in addition the the secrets we had from week 7:
+- VM_HOST → azureuser@<vm-public-ip>
+- VM_SSH_KEY → Contents of the private ~/.ssh/id_rsa file (not the .pub!)
+
+we will add one more secret: 
+- AZURE_CREDENTIALS → A service principal in JSON format to allow azure/login
+
+Create with:
+```bash
+az ad sp create-for-rbac --name "gh-actions" --sdk-auth
+```
+- copy the entire json output into the `AZURE_CREDENTIALS` secret
+ 
+
+### new `post-deploy-week8.yml` file for week 8 additions:
+- Get Public IP Name
+- Make IP Static
+- Get VM Public IP
+- Run Initial Healthcheck
+
+```bash
+name: Week 8 Post-Deploy Tasks
+
+on:
+  workflow_call:
+    outputs:
+      ip_status:
+        description: "Was the IP made static successfully?"
+        value: ${{ jobs.week8_post_deploy.outputs.ip_status }}
+
+jobs:
+  week8_post_deploy:
+    runs-on: ubuntu-latest
+    outputs:
+      ip_status: ${{ steps.recheck.outcome }}
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get Public IP Name
+        id: get_ip_name
+        run: |
+          IP_NAME=$(az network public-ip list \
+            --resource-group bennyVMeastus2 \
+            --query "[0].name" -o tsv)
+          echo "IP_NAME=$IP_NAME" >> $GITHUB_ENV
+
+      - name: Make IP Static
+        run: |
+          az network public-ip update \
+            --resource-group bennyVMeastus2 \
+            --name "$IP_NAME" \
+            --allocation-method Static
+
+      - name: Get VM Public IP
+        id: get_vm_ip
+        run: |
+          VM_IP=$(az vm show -d -g bennyVMeastus2 -n myvm --query publicIps -o tsv)
+          echo "VM_IP=$VM_IP" >> $GITHUB_ENV
+
+      - name: Run Initial Healthcheck
+        run: |
+          echo "Checking http://$VM_IP:3000..." > healthcheck.log
+          if curl --fail --silent http://$VM_IP:3000; then
+            echo "Initial health check passed" >> healthcheck.log
+          else
+            echo "Initial health check failed" >> healthcheck.log
+            exit 1
+          fi
+```
+
+### Update main file `cicd.yml` with this file addition:
+```bash
+  post-deploy-week8:
+    needs: deploy-to-azure-vm
+    uses: ./.github/workflows/post-deploy-week8.yml
+    secrets: inherit
+```
+
+---
+
+## Create and Attach a P1 Disk
+`create-disk.yml`:
+```bash
+name: Attach P1 Disk
+
+on:
+  workflow_dispatch:
+
+jobs:
+  attach-p1-disk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Create and Attach P1 Premium SSD
+        run: |
+          RESOURCE_GROUP="bennyVMeastus2"
+          VM_NAME="myvm"
+          LOCATION="eastus2"
+          DISK_NAME="myP1Disk"
+
+          echo "Creating 4 GiB P1 Premium SSD ($DISK_NAME)..."
+          az disk create \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$DISK_NAME" \
+            --sku Premium_LRS \
+            --tier P1 \
+            --size-gb 4 \
+            --location "$LOCATION"
+
+          echo "Attaching $DISK_NAME to $VM_NAME..."
+          az vm disk attach \
+            --resource-group "$RESOURCE_GROUP" \
+            --vm-name "$VM_NAME" \
+            --name "$DISK_NAME"
+```
+
+### Update main file `cicd.yml` with this file addition:
+```bash
+  create-and-attach-disk:
+    needs: deploy-to-azure-vm
+    uses: ./.github/workflows/create-disk.yml
+    secrets: inherit
+```
+
+---
+
+## Deployment Log
+### deployment-log.yml – Generate deployment_log.md:
+capture actual steps during the deployment and then write them into `deployment_log.md` file in the repo
+```bash
+name: Write Deployment Log
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  log:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get VM Public IP
+        id: get_ip
+        run: |
+          VM_IP=$(az vm show -d -g bennyVMeastus2 -n myvm --query publicIps -o tsv)
+          echo "VM_IP=$VM_IP" >> $GITHUB_ENV
+
+      - name: Create deployment_log.md
+        run: |
+          TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+          cat <<EOF > deployment_log.md
+          # Week 8 Deployment Log
+
+          ## Timestamp
+          $TIMESTAMP
+
+          ## Public IP
+          $VM_IP
+
+          ## Azure CLI Commands
+
+          - az login --use-device-code
+          - az account set --subscription ...
+          - az group create --name bennyVMeastus2 --location eastus2
+          - az vm create --resource-group bennyVMeastus2 --name myvm ...
+          - az network public-ip update --allocation-method Static
+          - az vm open-port --port 22 ...
+          - scp ./ to VM
+          - docker-compose up -d
+
+          ## Deployment Method
+          - GitHub Actions CI/CD (via deploy-vm.yml)
+
+          ## Healthcheck
+          - curl http://$VM_IP:3000
+
+          ## Reboot Test
+          - App recovered after reboot
+
+          ## Browser Compatibility
+          - Chrome
+          - Firefox
+          - Mobile
+          EOF
+
+      - name: Commit and push deployment_log.md
+        run: |
+          git config --global user.name "gh-actions"
+          git config --global user.email "github-actions@users.noreply.github.com"
+          git add deployment_log.md
+          git commit -m "Add deployment_log.md [skip ci]" || echo "No changes to commit"
+          git push origin HEAD
+```
+
+### Update main file `cicd.yml` with this file addition:
+```bash
+  write-deployment-log:
+    needs: post-deploy-week8
+    uses: ./.github/workflows/write-deployment-log.yml
+    secrets: inherit
+```
+
+---
+
+## reboot-check.yml – Reboot VM and Check App Health
+### This workflow reboots the VM via SSH, waits, then checks if the app is reachable via curl
+`reboot-check.yml`, it is not run automaticaly in the cicd, it can be run individualy in the github actions:
+```bash
+name: Reboot and Healthcheck
+
+on:
+  workflow_dispatch:
+
+jobs:
+  reboot-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get VM IP (via Azure CLI)
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get Public IP
+        id: get_ip
+        run: |
+          VM_IP=$(az vm show -d -g bennyVMeastus2 -n myvm --query publicIps -o tsv)
+          echo "VM_IP=$VM_IP" >> $GITHUB_ENV
+
+      - name: Reboot VM via SSH
+        run: |
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.VM_HOST }} "sudo reboot" || true
+          echo "Waiting 90s for reboot..."
+          sleep 90
+
+      - name: Health Check After Reboot
+        run: |
+          echo "Rechecking app at http://$VM_IP:3000" > reboot-healthcheck.log
+          if curl --fail --silent http://$VM_IP:3000; then
+            echo "App came back online" >> reboot-healthcheck.log
+          else
+            echo "App failed after reboot" >> reboot-healthcheck.log
+            exit 1
+          fi
+
+      - name: Upload Healthcheck Result
+        uses: actions/upload-artifact@v4
+        with:
+          name: reboot-healthcheck-log
+          path: reboot-healthcheck.log
+```

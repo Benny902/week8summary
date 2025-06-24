@@ -60,3 +60,18 @@ jobs:
     # needs: [backend-docker-build, frontend-docker-build]
     needs: [deploy-to-azure-vm]
     uses: ./.github/workflows/e2e-tests.yml
+
+  post-deploy-week8:
+    needs: deploy-to-azure-vm
+    uses: ./.github/workflows/post-deploy-week8.yml
+    secrets: inherit
+
+  create-and-attach-disk:
+    needs: deploy-to-azure-vm
+    uses: ./.github/workflows/create-disk.yml
+    secrets: inherit
+
+  write-deployment-log:
+    needs: post-deploy-week8
+    uses: ./.github/workflows/write-deployment-log.yml
+    secrets: inherit
