@@ -51,7 +51,7 @@ async function loadBlogs() {
     deleteBtn.textContent = 'Delete';
     deleteBtn.className = 'delete-btn';
     deleteBtn.onclick = () => {
-      deleteBlog(blog.id);
+      deleteBlog(blog._id || blog.id);
     };
 
     const timestampDiv = document.createElement('div');
@@ -89,8 +89,7 @@ function startEdit(blog, blogDiv, textDiv) {
   saveBtn.textContent = 'Save';
   saveBtn.className = 'save-btn';
   saveBtn.onclick = async () => {
-    await updateBlog(blog.id, textarea.value.trim());
-    loadBlogs();
+    await updateBlog(blog._id || blog.id, textarea.value.trim());
   };
 
   const cancelBtn = document.createElement('button');
