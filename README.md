@@ -883,9 +883,15 @@ and now we can see that the containers are running in the azure:
 ## Flowchart:  
 ![alt text](images/week7-architecture.png) 
 
+## GitHub Actions Flow:  
+![alt text](images/week8-github-actions-flow.png) 
+
+## Before and after VM restart:  
+![alt text](images/before-and-after-vm-restart.png) 
+
 ### GitHubSecrets Required (Settings > Secrets and variables > Actions): 
 in addition the the secrets we had from week 7:
-- VM_HOST → azureuser@<vm-public-ip>
+- VM_HOST → azureuser@< vm-public-ip >
 - VM_SSH_KEY → Contents of the private ~/.ssh/id_rsa file (not the .pub!)
 
 we will add one more secret: 
@@ -1161,3 +1167,9 @@ jobs:
           name: reboot-healthcheck-log
           path: reboot-healthcheck.log
 ```
+
+## Reboot check:  
+![alt text](images/reboot-check.png) 
+
+## Before and after VM restart:  
+![alt text](images/before-and-after-vm-restart.png) 
